@@ -6,6 +6,12 @@
       "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
       "runtimeArgs": ["node_modules/expo/bin/cli", "start", "--web", "--port", "8081"],
       "port": 8081
+    },
+    {
+      "name": "web-static",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
+      "runtimeArgs": ["node_modules/expo/bin/cli", "serve", "--port", "8088"],
+      "port": 8088
     }
   ]
 }

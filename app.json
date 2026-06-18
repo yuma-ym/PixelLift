@@ -14,6 +14,10 @@
     "android": {
       "package": "com.yourname.pixellift"
     },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
     "plugins": [
       "expo-router",
       "expo-font",

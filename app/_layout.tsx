@@ -9,7 +9,7 @@ import { colors } from '../src/theme';
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const [loaded] = useFonts({ DotGothic16_400Regular });
+  const [loaded, error] = useFonts({ DotGothic16_400Regular });
   const seedIfNeeded = useStore((s) => s.seedIfNeeded);
 
   useEffect(() => {
@@ -17,10 +17,11 @@ export default function RootLayout() {
   }, [seedIfNeeded]);
 
   useEffect(() => {
-    if (loaded) SplashScreen.hideAsync();
-  }, [loaded]);
+    if (loaded || error) SplashScreen.hideAsync();
+  }, [loaded, error]);
 
-  if (!loaded) return null;
+  // フォント読込が終わるか失敗するまで待つ（失敗時はフォールバックフォントで続行）
+  if (!loaded && !error) return null;
 
   return (
     <>
