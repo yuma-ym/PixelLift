@@ -1,18 +1,18 @@
-import React, { useState } from 'react';
-import { View, Pressable, StyleSheet, ViewStyle } from 'react-native';
-import { colors, muscleColor } from '../theme';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Pressable, StyleSheet, ViewStyle, Animated, Easing, Image } from 'react-native';
+import { colors, muscleColor, muscleShadow } from '../theme';
 import type { MuscleGroup } from '../theme';
 import { PixelText } from './Frame';
+import { heroSprites } from '../sprites';
+import HeroSprite from './HeroSprite';
 
 // ── 主人公ボディマップ ───────────────────────────
 // 各筋肉がそのままボタン。中央のダンベルでワークアウト開始。
-// 本物のスプライト(PNG)が用意できたら HeroSprite を差し替えるだけ。
-//   例) <Image source={require('../../assets/hero-front.png')}
-//             style={StyleSheet.absoluteFill} resizeMode="contain" />
-// を stage 内に置き、各 Part を transparent なヒットエリアにする。
+// assets に PNG を置いて src/sprites.ts を設定すると、コード製ボディが
+// 自動で本物スプライトに差し替わり、各 Part は透明の当たり判定になる。
 
-const STAGE_W = 240;
-const STAGE_H = 320;
+const STAGE_W = 260;
+const STAGE_H = 340;
 
 type Props = {
   onSelectMuscle: (m: MuscleGroup) => void;
@@ -21,10 +21,57 @@ type Props = {
 
 export default function Hero({ onSelectMuscle, onStartWorkout }: Props) {
   const [view, setView] = useState<'front' | 'back'>('front');
+  const sprite = view === 'front' ? heroSprites.front : heroSprites.back;
+  const hasSprite = !!sprite;
+  const bg = heroSprites.stageBg;
+
+  // アイドルの上下ゆれ
+  const bob = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(bob, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(bob, { toValue: 0, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [bob]);
+  const translateY = bob.interpolate({ inputRange: [0, 1], outputRange: [0, -4] });
+
+  // ダンベルの淡い明滅
+  const glow = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glow, { toValue: 1, duration: 900, useNativeDriver: true }),
+        Animated.timing(glow, { toValue: 0, duration: 900, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [glow]);
+  const glowOpacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0.25, 0.75] });
 
   return (
     <View style={{ alignItems: 'center' }}>
       <View style={styles.stage}>
+        {bg ? (
+          <>
+            {/* 生成した風景背景 */}
+            <Image source={bg} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            {/* 下側を少し暗くして主人公を引き立てる */}
+            <View pointerEvents="none" style={styles.bgVignette} />
+          </>
+        ) : (
+          <>
+            {/* 背景PNGが無い時はコード製の明かり＋床 */}
+            <View pointerEvents="none" style={styles.stageGlow} />
+            <View pointerEvents="none" style={styles.floor} />
+            <View pointerEvents="none" style={[styles.floorLine, { bottom: 30 }]} />
+            <View pointerEvents="none" style={[styles.floorLine, { bottom: 16 }]} />
+          </>
+        )}
 
         {/* 向き切り替え */}
         <Pressable
@@ -36,74 +83,82 @@ export default function Hero({ onSelectMuscle, onStartWorkout }: Props) {
           </PixelText>
         </Pressable>
 
-        {/* 頭 */}
-        <View style={[styles.abs, { left: 97, top: 10, width: 46, height: 14, backgroundColor: '#2a1a10', borderTopLeftRadius: 3, borderTopRightRadius: 3, borderWidth: 2, borderColor: colors.outline }]} />
-        <View style={[styles.abs, { left: 99, top: 22, width: 42, height: 30, backgroundColor: '#e7ad7e', borderWidth: 2, borderColor: colors.outline, borderRadius: 2 }]} />
-        <View style={[styles.abs, { left: 99, top: 22, width: 42, height: 8, backgroundColor: '#2a1a10' }]} />
-        {view === 'front' && <>
-          <View style={[styles.abs, { left: 108, top: 34, width: 5, height: 5, backgroundColor: colors.outline }]} />
-          <View style={[styles.abs, { left: 127, top: 34, width: 5, height: 5, backgroundColor: colors.outline }]} />
-        </>}
-        {/* 首 */}
-        <View style={[styles.abs, { left: 112, top: 52, width: 16, height: 8, backgroundColor: '#c98a55', borderWidth: 2, borderColor: colors.outline }]} />
+        {/* 足元の影 */}
+        <View pointerEvents="none" style={styles.bodyShadow} />
 
-        {/* 肩 */}
-        <Part group="肩" onPress={onSelectMuscle} style={{ left: 46, top: 58, width: 42, height: 24, borderTopLeftRadius: 6, borderTopRightRadius: 6 }} />
-        <Part group="肩" onPress={onSelectMuscle} style={{ left: 152, top: 58, width: 42, height: 24, borderTopLeftRadius: 6, borderTopRightRadius: 6 }} />
-
-        {/* 腕 */}
-        <Part group="腕" onPress={onSelectMuscle} style={{ left: 42, top: 82, width: 28, height: 78, borderRadius: 6 }} />
-        <Part group="腕" onPress={onSelectMuscle} style={{ left: 170, top: 82, width: 28, height: 78, borderRadius: 6 }} />
-
-        {view === 'front' ? (
-          <>
-            {/* 胸 */}
-            <Part group="胸" onPress={onSelectMuscle} style={{ left: 74, top: 74, width: 43, height: 34, borderRadius: 6 }} />
-            <Part group="胸" onPress={onSelectMuscle} style={{ left: 123, top: 74, width: 43, height: 34, borderRadius: 6 }} />
-            {/* 腹 */}
-            <Part group="腹" onPress={onSelectMuscle} style={{ left: 92, top: 110, width: 56, height: 54, borderRadius: 4 }} />
-          </>
-        ) : (
-          // 背中（胸＋腹のエリアをまとめて1ボタン）
-          <Part group="背中" onPress={onSelectMuscle} style={{ left: 74, top: 74, width: 92, height: 90, borderRadius: 6 }} />
-        )}
-
-        {/* トランクス */}
-        <View style={[styles.abs, { left: 84, top: 164, width: 72, height: 28, backgroundColor: '#3A4A6A', borderWidth: 2, borderColor: colors.outline, borderRadius: 3 }]} />
-
-        {/* 脚 */}
-        <Part group="脚" onPress={onSelectMuscle} style={{ left: 86, top: 190, width: 30, height: 80, borderRadius: 4 }} />
-        <Part group="脚" onPress={onSelectMuscle} style={{ left: 124, top: 190, width: 30, height: 80, borderRadius: 4 }} />
-
-        {/* ブーツ */}
-        <View style={[styles.abs, { left: 84, top: 270, width: 34, height: 18, backgroundColor: '#6b4326', borderWidth: 2, borderColor: colors.outline, borderRadius: 2 }]} />
-        <View style={[styles.abs, { left: 122, top: 270, width: 34, height: 18, backgroundColor: '#6b4326', borderWidth: 2, borderColor: colors.outline, borderRadius: 2 }]} />
+        <Animated.View style={[styles.bodyWrap, { transform: [{ translateY }] }]}>
+          {hasSprite ? (
+            <Image source={sprite!} style={styles.spriteImg} resizeMode="contain" />
+          ) : (
+            <View style={styles.spriteSvg}>
+              <HeroSprite view={view} width={STAGE_W - 36} height={STAGE_H - 30} />
+            </View>
+          )}
+          {/* 絵の上に重ねる透明な当たり判定 */}
+          <HitAreas view={view} onSelectMuscle={onSelectMuscle} transparent />
+        </Animated.View>
 
         {/* 中央のダンベル＝ワークアウト開始 */}
         <Pressable onPress={onStartWorkout} style={({ pressed }) => [styles.dumbbell, { opacity: pressed ? 0.7 : 1 }]}>
+          <Animated.View pointerEvents="none" style={[styles.dbGlow, { opacity: glowOpacity }]} />
           <View style={styles.dbWeight} />
           <View style={styles.dbBar} />
           <View style={styles.dbWeight} />
         </Pressable>
 
-        {/* 有酸素は小さなボタンで床に */}
+        {/* 有酸素は床のボタン */}
         {view === 'front' && (
-          <Pressable onPress={() => onSelectMuscle('有酸素')} style={styles.cardioBtn}>
+          <Pressable onPress={() => onSelectMuscle('有酸素')} style={({ pressed }) => [styles.cardioBtn, { opacity: pressed ? 0.7 : 1 }]}>
             <PixelText size={10} color={colors.outline}>有酸素</PixelText>
           </Pressable>
         )}
       </View>
 
-      <PixelText size={11} color={colors.inkDim} style={{ marginTop: 8, textAlign: 'center' }}>
-        部位をタップ → 種目へ ／ 中央のダンベル → ワークアウト開始
+      <PixelText size={11} color={colors.inkDim} style={{ marginTop: 10, textAlign: 'center' }} shadow>
+        部位をタップ → 種目へ ／ 中央の輝くダンベル → ワークアウト開始
       </PixelText>
     </View>
   );
 }
 
+// ── 筋肉の当たり判定（SVG/PNGの上に重ねる透明ボタン）────
+function HitAreas(
+  { view, onSelectMuscle, transparent }:
+  { view: 'front' | 'back'; onSelectMuscle: (m: MuscleGroup) => void; transparent?: boolean }
+) {
+  return (
+    <>
+      {/* 座標は HeroSprite(viewBox120x160) を stage に scale した位置に合わせてある */}
+      {/* 肩 */}
+      <Part group="肩" t={transparent} onPress={onSelectMuscle} style={{ left: 70, top: 97, width: 42, height: 31, borderTopLeftRadius: 8, borderTopRightRadius: 8 }} />
+      <Part group="肩" t={transparent} onPress={onSelectMuscle} style={{ left: 149, top: 97, width: 42, height: 31, borderTopLeftRadius: 8, borderTopRightRadius: 8 }} />
+
+      {/* 腕 */}
+      <Part group="腕" t={transparent} onPress={onSelectMuscle} style={{ left: 59, top: 120, width: 30, height: 89, borderRadius: 7 }} />
+      <Part group="腕" t={transparent} onPress={onSelectMuscle} style={{ left: 171, top: 120, width: 30, height: 89, borderRadius: 7 }} />
+
+      {view === 'front' ? (
+        <>
+          {/* 胸 */}
+          <Part group="胸" t={transparent} onPress={onSelectMuscle} style={{ left: 100, top: 105, width: 30, height: 50, borderRadius: 7 }} />
+          <Part group="胸" t={transparent} onPress={onSelectMuscle} style={{ left: 130, top: 105, width: 30, height: 50, borderRadius: 7 }} />
+          {/* 腹 */}
+          <Part group="腹" t={transparent} onPress={onSelectMuscle} style={{ left: 111, top: 155, width: 38, height: 58, borderRadius: 5 }} />
+        </>
+      ) : (
+        <Part group="背中" t={transparent} onPress={onSelectMuscle} style={{ left: 100, top: 105, width: 60, height: 108, borderRadius: 7 }} />
+      )}
+
+      {/* 脚 */}
+      <Part group="脚" t={transparent} onPress={onSelectMuscle} style={{ left: 111, top: 237, width: 26, height: 58, borderRadius: 5 }} />
+      <Part group="脚" t={transparent} onPress={onSelectMuscle} style={{ left: 137, top: 237, width: 26, height: 58, borderRadius: 5 }} />
+    </>
+  );
+}
+
 function Part(
-  { group, onPress, style }:
-  { group: MuscleGroup; onPress: (m: MuscleGroup) => void; style: ViewStyle }
+  { group, onPress, style, t }:
+  { group: MuscleGroup; onPress: (m: MuscleGroup) => void; style: ViewStyle; t?: boolean }
 ) {
   return (
     <Pressable
@@ -112,9 +167,19 @@ function Part(
         styles.abs,
         styles.part,
         style,
-        { backgroundColor: muscleColor[group], opacity: pressed ? 0.6 : 1 },
+        t
+          ? { backgroundColor: muscleColor[group], opacity: pressed ? 0.4 : 0, borderWidth: 0 }
+          : {
+              backgroundColor: muscleColor[group],
+              borderBottomColor: muscleShadow[group],
+              borderRightColor: muscleShadow[group],
+              opacity: pressed ? 0.6 : 1,
+            },
       ]}
-    />
+    >
+      {/* 筋肉の上辺ハイライト（立体感） */}
+      {!t && <View pointerEvents="none" style={styles.partSheen} />}
+    </Pressable>
   );
 }
 
@@ -128,16 +193,50 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     overflow: 'hidden',
   },
+  stageGlow: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 90,
+    backgroundColor: colors.stageGlow, opacity: 0.6,
+  },
+  bgVignette: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, height: 110,
+    backgroundColor: colors.bgDeep, opacity: 0.45,
+  },
+  floor: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, height: 44,
+    backgroundColor: colors.bgDeep, opacity: 0.55,
+  },
+  floorLine: {
+    position: 'absolute', left: 0, right: 0, height: 2,
+    backgroundColor: colors.outline, opacity: 0.4,
+  },
+  bodyWrap: { ...StyleSheet.absoluteFillObject },
+  // PNGスプライト: ステージいっぱいに contain で中央最大表示
+  spriteImg: { position: 'absolute', left: 6, right: 6, top: 6, bottom: 8 },
+  // SVGボディ: 中央寄せ
+  spriteSvg: { position: 'absolute', left: 18, top: 4, width: STAGE_W - 36, height: STAGE_H - 30 },
+  bodyShadow: {
+    position: 'absolute', left: 92, bottom: 22, width: 76, height: 12,
+    backgroundColor: colors.shadow, opacity: 0.4, borderRadius: 999,
+    transform: [{ scaleX: 1.4 }],
+  },
   abs: { position: 'absolute' },
-  part: { borderWidth: 2, borderColor: colors.outline },
+  part: { borderWidth: 2, borderColor: colors.outline, overflow: 'hidden' },
+  partSheen: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: 5,
+    backgroundColor: '#ffffff', opacity: 0.25,
+  },
   flip: {
     position: 'absolute', right: 6, top: 6, zIndex: 5,
     borderWidth: 2, borderColor: colors.frame, borderRadius: 3,
     paddingHorizontal: 6, paddingVertical: 2, backgroundColor: colors.win,
   },
   dumbbell: {
-    position: 'absolute', left: 84, top: 128, width: 72, height: 30,
+    position: 'absolute', left: 94, top: 138, width: 72, height: 30,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', zIndex: 4,
+  },
+  dbGlow: {
+    position: 'absolute', left: -10, right: -10, top: -10, bottom: -10,
+    backgroundColor: colors.frameHi, borderRadius: 999,
   },
   dbWeight: {
     width: 14, height: 30, backgroundColor: colors.frameHi,
@@ -148,9 +247,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 2, borderBottomWidth: 2, borderColor: colors.outline,
   },
   cardioBtn: {
-    position: 'absolute', left: 175, bottom: 10,
+    position: 'absolute', right: 12, bottom: 12, zIndex: 6,
     backgroundColor: muscleColor['有酸素'],
     borderWidth: 2, borderColor: colors.outline, borderRadius: 3,
-    paddingHorizontal: 7, paddingVertical: 3,
+    paddingHorizontal: 8, paddingVertical: 4,
   },
 });

@@ -14,7 +14,11 @@
     "android": {
       "package": "com.yourname.pixellift"
     },
-    "plugins": ["expo-router", "expo-font"],
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-splash-screen"
+    ],
     "experiments": {
       "typedRoutes": true
     }
