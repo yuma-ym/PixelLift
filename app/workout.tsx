@@ -123,6 +123,21 @@ export default function Workout() {
     map[set.exerciseId].push(set);
   }
 
+  // 並べ替え用バケット: 着手中=0(上) / 未着手=1 / 全完了=2(下)
+  const allDoneOf = (exId: string) => {
+    const sets = map[exId];
+    return sets.length > 0 && sets.every((x) => x.completed);
+  };
+  const bucketOf = (exId: string) => {
+    const sets = map[exId];
+    const done = sets.filter((x) => x.completed).length;
+    if (done > 0 && done === sets.length) return 2;
+    if (done > 0) return 0;
+    return 1;
+  };
+  // 安定ソート（同バケット内は出現順を維持）
+  const sortedOrder = [...order].sort((a, b) => bucketOf(a) - bucketOf(b));
+
   const finish = () => { finishSession(session.id); router.back(); };
 
   // セット完了でレスト自動スタート（離れても/閉じても継続するよう永続化＋通知予約）
@@ -173,12 +188,13 @@ export default function Workout() {
           </PixelText></Win>
         )}
 
-        {order.map((exId) => {
+        {sortedOrder.map((exId) => {
           const ex = getExercise(exId);
           const sets = map[exId];
           const mc = ex ? muscleColor[ex.muscle] : colors.frame;
+          const done = allDoneOf(exId);
           return (
-            <Win key={exId}>
+            <Win key={exId} style={done ? styles.exDone : undefined}>
               <View style={styles.exHead}>
                 <View style={[styles.exBar, { backgroundColor: mc }]} />
                 <PixelText size={14} color={mc} style={{ flex: 1 }}>{ex?.name ?? '種目'}</PixelText>
@@ -290,6 +306,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 10, backgroundColor: colors.win, minWidth: 38, alignItems: 'center',
   },
   restReset: { paddingVertical: 2, paddingHorizontal: 10 },
+  exDone: { opacity: 0.45 },
   exHead: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 8 },
   exBar: { width: 8, height: 20, borderWidth: 2, borderColor: colors.outline },
   colHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 4, gap: 6 },
