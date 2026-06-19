@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, ScrollView, Pressable, TextInput, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
-import { useStore, sessionVolume, completedCount, formatVolume } from '../src/store/useStore';
+import { useStore } from '../src/store/useStore';
 import { colors, muscleColor } from '../src/theme';
 import type { MuscleGroup } from '../src/theme';
 import { muscleGroups } from '../src/theme';
@@ -27,6 +27,8 @@ export default function Workout() {
 
   const [now, setNow] = useState(Date.now());
   const [pickerMuscle, setPickerMuscle] = useState<MuscleGroup | null>(null);
+  const [restStartAt, setRestStartAt] = useState<number | null>(null);
+  const [restDuration, setRestDuration] = useState(90);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -88,6 +90,20 @@ export default function Workout() {
 
   const finish = () => { finishSession(session.id); router.back(); };
 
+  // レストタイマー（セット完了で自動スタート、プリセットで手動も可）
+  const startRest = (d: number = restDuration) => { setRestDuration(d); setRestStartAt(Date.now()); };
+  const restElapsed = restStartAt ? Math.floor((now - restStartAt) / 1000) : 0;
+  const restRemain = restStartAt ? Math.max(0, restDuration - restElapsed) : restDuration;
+  const restDone = restStartAt != null && restRemain === 0;
+  const rmm = String(Math.floor(restRemain / 60)).padStart(2, '0');
+  const rss = String(restRemain % 60).padStart(2, '0');
+
+  const toggleSet = (s: SetRecord) => {
+    const next = !s.completed;
+    updateSet(session.id, s.id, { completed: next });
+    if (next) startRest();
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -99,10 +115,26 @@ export default function Workout() {
           <PixelText size={11} color={colors.inkDim}>{mm}:{ss}</PixelText>
         </Win>
 
-        <Win style={styles.statWin}>
-          <Stat value={`${completedCount(session)}`} label="完了セット" />
-          <View style={styles.div} />
-          <Stat value={formatVolume(sessionVolume(session))} label="挙上量" />
+        <Win style={styles.restWin}>
+          <View style={styles.restTop}>
+            <PixelText size={11} color={colors.inkDim}>レストタイマー</PixelText>
+            <PixelText size={32} color={restDone ? colors.success : colors.frameHi} shadow>
+              {restDone ? '休憩おわり' : `${rmm}:${rss}`}
+            </PixelText>
+          </View>
+          <View style={styles.restBtns}>
+            {[60, 90, 120].map((d) => (
+              <Pressable key={d} onPress={() => startRest(d)}
+                style={[styles.restChip, restStartAt != null && restDuration === d && styles.restChipOn]}>
+                <PixelText size={12} color={restStartAt != null && restDuration === d ? colors.outline : colors.ink}>
+                  {d}秒
+                </PixelText>
+              </Pressable>
+            ))}
+            <Pressable onPress={() => setRestStartAt(null)} style={styles.restChip}>
+              <PixelText size={12} color={colors.inkDim}>リセット</PixelText>
+            </Pressable>
+          </View>
         </Win>
 
         {order.length === 0 && (
@@ -126,10 +158,11 @@ export default function Workout() {
               </View>
 
               <View style={styles.colHead}>
-                <PixelText size={9} color={colors.inkDim} style={{ width: 28 }}>SET</PixelText>
-                <PixelText size={9} color={colors.inkDim} style={styles.colFlex}>kg</PixelText>
-                <PixelText size={9} color={colors.inkDim} style={styles.colFlex}>回数</PixelText>
-                <View style={{ width: 56 }} />
+                <PixelText size={9} color={colors.inkDim} style={{ width: 22 }}>SET</PixelText>
+                <PixelText size={9} color={colors.inkDim} style={{ width: 62, textAlign: 'center' }}>kg</PixelText>
+                <PixelText size={9} color={colors.inkDim} style={{ width: 56, textAlign: 'center' }}>回数</PixelText>
+                <PixelText size={9} color={colors.inkDim} style={{ flex: 1, textAlign: 'center' }}>完了</PixelText>
+                <View style={{ width: 26 }} />
               </View>
 
               {sets.map((set) => (
@@ -138,7 +171,7 @@ export default function Workout() {
                   set={set}
                   onWeight={(v) => updateSet(session.id, set.id, { weight: v })}
                   onReps={(v) => updateSet(session.id, set.id, { reps: v })}
-                  onToggle={() => updateSet(session.id, set.id, { completed: !set.completed })}
+                  onToggle={() => toggleSet(set)}
                   onDelete={() => deleteSet(session.id, set.id)}
                 />
               ))}
@@ -179,15 +212,6 @@ export default function Workout() {
   );
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
-  return (
-    <View style={{ flex: 1, alignItems: 'center' }}>
-      <PixelText size={16} color={colors.frameHi}>{value}</PixelText>
-      <PixelText size={9} color={colors.inkDim}>{label}</PixelText>
-    </View>
-  );
-}
-
 function SetRow(
   { set, onWeight, onReps, onToggle, onDelete }:
   {
@@ -198,25 +222,25 @@ function SetRow(
 ) {
   return (
     <View style={[styles.setRow, set.completed && styles.setRowDone]}>
-      <PixelText size={12} color={colors.frameHi} style={{ width: 28 }}>{set.setIndex}</PixelText>
+      <PixelText size={13} color={colors.frameHi} style={{ width: 22 }}>{set.setIndex}</PixelText>
       <TextInput
         defaultValue={set.weight ? String(set.weight) : ''}
         onChangeText={(t) => onWeight(parseFloat(t) || 0)}
         keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.inkDim}
-        style={styles.field}
+        style={[styles.field, { width: 62 }]}
       />
       <TextInput
         defaultValue={set.reps ? String(set.reps) : ''}
         onChangeText={(t) => onReps(parseInt(t, 10) || 0)}
         keyboardType="number-pad" placeholder="0" placeholderTextColor={colors.inkDim}
-        style={styles.field}
+        style={[styles.field, { width: 56 }]}
       />
-      <Pressable onPress={onToggle} style={{ width: 28, alignItems: 'center' }}>
-        <PixelText size={18} color={set.completed ? colors.success : colors.inkDim}>
-          {set.completed ? '★' : '☆'}
+      <Pressable onPress={onToggle} style={[styles.check, set.completed && styles.checkDone]}>
+        <PixelText size={16} color={set.completed ? colors.outline : colors.inkDim}>
+          {set.completed ? '✓ 完了' : '□ 未'}
         </PixelText>
       </Pressable>
-      <Pressable onPress={onDelete} style={{ width: 28, alignItems: 'center' }}>
+      <Pressable onPress={onDelete} hitSlop={6} style={{ width: 26, alignItems: 'center' }}>
         <PixelText size={13} color={colors.danger}>✕</PixelText>
       </Pressable>
     </View>
@@ -228,19 +252,28 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   scroll: { padding: 14, gap: 10 },
   headerWin: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  statWin: { flexDirection: 'row', alignItems: 'center' },
-  div: { width: 2, height: 30, backgroundColor: colors.outline },
+  restWin: { alignItems: 'center', gap: 8 },
+  restTop: { alignItems: 'center' },
+  restBtns: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', justifyContent: 'center' },
+  restChip: {
+    borderWidth: 2, borderColor: colors.frame, borderRadius: 3,
+    paddingHorizontal: 12, paddingVertical: 6, backgroundColor: colors.win,
+  },
+  restChipOn: { backgroundColor: colors.frameHi },
   exHead: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 8 },
   exBar: { width: 8, height: 20, borderWidth: 2, borderColor: colors.outline },
-  colHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  colFlex: { flex: 1, textAlign: 'center' },
-  setRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
+  colHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 4, gap: 6 },
+  setRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5, gap: 6 },
   setRowDone: { backgroundColor: 'rgba(111,207,82,0.12)' },
   field: {
-    flex: 1, marginHorizontal: 4,
-    fontFamily: 'DotGothic16_400Regular', fontSize: 14, color: colors.ink, textAlign: 'center',
-    backgroundColor: '#06050D', borderWidth: 2, borderColor: colors.frame, borderRadius: 2, paddingVertical: 4,
+    fontFamily: 'DotGothic16_400Regular', fontSize: 15, color: colors.ink, textAlign: 'center',
+    backgroundColor: '#06050D', borderWidth: 2, borderColor: colors.frame, borderRadius: 2, paddingVertical: 5,
   },
+  check: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    height: 38, borderWidth: 2, borderColor: colors.frame, borderRadius: 3, backgroundColor: colors.win,
+  },
+  checkDone: { backgroundColor: colors.success, borderColor: colors.outline },
   addSet: {
     marginTop: 7, alignItems: 'center', paddingVertical: 5,
     borderWidth: 2, borderColor: colors.outline, borderRadius: 2,
