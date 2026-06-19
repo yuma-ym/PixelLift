@@ -28,7 +28,8 @@ export default function Workout() {
   const [now, setNow] = useState(Date.now());
   const [pickerMuscle, setPickerMuscle] = useState<MuscleGroup | null>(null);
   const [restStartAt, setRestStartAt] = useState<number | null>(null);
-  const [restDuration, setRestDuration] = useState(90);
+  const restDuration = useStore((s) => s.restDuration);
+  const setRestDuration = useStore((s) => s.setRestDuration);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -90,8 +91,8 @@ export default function Workout() {
 
   const finish = () => { finishSession(session.id); router.back(); };
 
-  // レストタイマー（セット完了で自動スタート、プリセットで手動も可）
-  const startRest = (d: number = restDuration) => { setRestDuration(d); setRestStartAt(Date.now()); };
+  // レストタイマー（セット完了で自動スタート。秒数は永続化された restDuration を使う）
+  const startRest = () => setRestStartAt(Date.now());
   const restElapsed = restStartAt ? Math.floor((now - restStartAt) / 1000) : 0;
   const restRemain = restStartAt ? Math.max(0, restDuration - restElapsed) : restDuration;
   const restDone = restStartAt != null && restRemain === 0;
@@ -116,25 +117,21 @@ export default function Workout() {
         </Win>
 
         <Win style={styles.restWin}>
-          <View style={styles.restTop}>
-            <PixelText size={11} color={colors.inkDim}>レストタイマー</PixelText>
-            <PixelText size={32} color={restDone ? colors.success : colors.frameHi} shadow>
+          <PixelText size={11} color={colors.inkDim}>レストタイマー</PixelText>
+          <View style={styles.restRow}>
+            <Pressable onPress={() => setRestDuration(restDuration - 30)} style={styles.restAdj}>
+              <PixelText size={15} color={colors.ink}>-30秒</PixelText>
+            </Pressable>
+            <PixelText size={32} color={restDone ? colors.success : colors.frameHi} shadow style={styles.restTime}>
               {restDone ? '休憩おわり' : `${rmm}:${rss}`}
             </PixelText>
-          </View>
-          <View style={styles.restBtns}>
-            {[60, 90, 120].map((d) => (
-              <Pressable key={d} onPress={() => startRest(d)}
-                style={[styles.restChip, restStartAt != null && restDuration === d && styles.restChipOn]}>
-                <PixelText size={12} color={restStartAt != null && restDuration === d ? colors.outline : colors.ink}>
-                  {d}秒
-                </PixelText>
-              </Pressable>
-            ))}
-            <Pressable onPress={() => setRestStartAt(null)} style={styles.restChip}>
-              <PixelText size={12} color={colors.inkDim}>リセット</PixelText>
+            <Pressable onPress={() => setRestDuration(restDuration + 10)} style={styles.restAdj}>
+              <PixelText size={15} color={colors.ink}>+10秒</PixelText>
             </Pressable>
           </View>
+          <Pressable onPress={() => setRestStartAt(null)} hitSlop={8} style={styles.restReset}>
+            <PixelText size={11} color={colors.inkDim}>リセット</PixelText>
+          </Pressable>
         </Win>
 
         {order.length === 0 && (
@@ -252,14 +249,14 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   scroll: { padding: 14, gap: 10 },
   headerWin: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  restWin: { alignItems: 'center', gap: 8 },
-  restTop: { alignItems: 'center' },
-  restBtns: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', justifyContent: 'center' },
-  restChip: {
-    borderWidth: 2, borderColor: colors.frame, borderRadius: 3,
-    paddingHorizontal: 12, paddingVertical: 6, backgroundColor: colors.win,
+  restWin: { alignItems: 'center', gap: 6 },
+  restRow: { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch', gap: 8 },
+  restTime: { flex: 1, textAlign: 'center' },
+  restAdj: {
+    borderWidth: 2, borderColor: colors.frame, borderRadius: 4,
+    paddingHorizontal: 12, paddingVertical: 10, backgroundColor: colors.win,
   },
-  restChipOn: { backgroundColor: colors.frameHi },
+  restReset: { paddingVertical: 2, paddingHorizontal: 10 },
   exHead: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 8 },
   exBar: { width: 8, height: 20, borderWidth: 2, borderColor: colors.outline },
   colHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 4, gap: 6 },
