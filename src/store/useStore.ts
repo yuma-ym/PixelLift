@@ -12,11 +12,14 @@ interface State {
   sessions: WorkoutSession[];
   currentSessionId: string | null;
   seeded: boolean;
-  restDuration: number; // レスト秒数（永続化）
+  restDuration: number;          // レスト秒数（永続化）
+  restStartAt: number | null;    // レスト開始時刻。画面を離れても/再起動しても継続するため永続化
 
   // セットアップ
   seedIfNeeded: () => void;
   setRestDuration: (n: number) => void;
+  startRest: () => void;
+  clearRest: () => void;
 
   // 種目
   addExercise: (name: string, muscle: MuscleGroup, instructions: string) => void;
@@ -50,6 +53,7 @@ export const useStore = create<State>()(
       currentSessionId: null,
       seeded: false,
       restDuration: 90,
+      restStartAt: null,
 
       seedIfNeeded: () => {
         if (get().seeded || get().exercises.length > 0) return;
@@ -57,6 +61,8 @@ export const useStore = create<State>()(
       },
 
       setRestDuration: (n) => set({ restDuration: Math.max(10, Math.min(900, Math.round(n))) }),
+      startRest: () => set({ restStartAt: Date.now() }),
+      clearRest: () => set({ restStartAt: null }),
 
       addExercise: (name, muscle, instructions) =>
         set((s) => ({
@@ -212,6 +218,7 @@ export const useStore = create<State>()(
         currentSessionId: s.currentSessionId,
         seeded: s.seeded,
         restDuration: s.restDuration,
+        restStartAt: s.restStartAt,
       }),
     }
   )

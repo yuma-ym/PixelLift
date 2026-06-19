@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { View, ScrollView, Pressable, TextInput, StyleSheet } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { View, ScrollView, Pressable, TextInput, StyleSheet, Vibration, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
 import { useStore } from '../src/store/useStore';
@@ -8,6 +8,7 @@ import type { MuscleGroup } from '../src/theme';
 import { muscleGroups } from '../src/theme';
 import { Win, PixelText, PixelButton } from '../src/components/Frame';
 import type { SetRecord } from '../src/types';
+import { setupNotifications, scheduleRestDone, cancelRestDone } from '../src/notify';
 
 export default function Workout() {
   const router = useRouter();
@@ -27,14 +28,47 @@ export default function Workout() {
 
   const [now, setNow] = useState(Date.now());
   const [pickerMuscle, setPickerMuscle] = useState<MuscleGroup | null>(null);
-  const [restStartAt, setRestStartAt] = useState<number | null>(null);
   const restDuration = useStore((s) => s.restDuration);
   const setRestDuration = useStore((s) => s.setRestDuration);
+  const restStartAt = useStore((s) => s.restStartAt);
+  const startRestStore = useStore((s) => s.startRest);
+  const clearRestStore = useStore((s) => s.clearRest);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  // 通知の初期設定（権限・チャンネル）
+  useEffect(() => { setupNotifications(); }, []);
+
+  // ── レストタイマー（永続化された restStartAt/restDuration から算出）──
+  const restElapsed = restStartAt ? Math.floor((now - restStartAt) / 1000) : 0;
+  const restRemain = restStartAt ? Math.max(0, restDuration - restElapsed) : restDuration;
+  const restDone = restStartAt != null && restRemain === 0;
+  const rmm = String(Math.floor(restRemain / 60)).padStart(2, '0');
+  const rss = String(restRemain % 60).padStart(2, '0');
+
+  // 前面でレストが 0 になった瞬間にバイブ
+  const prevDoneRef = useRef(false);
+  useEffect(() => {
+    if (restDone && !prevDoneRef.current) {
+      Vibration.vibrate(Platform.OS === 'android' ? [0, 300, 150, 300] : 800);
+    }
+    prevDoneRef.current = restDone;
+  }, [restDone]);
+
+  const startRest = () => { startRestStore(); scheduleRestDone(restDuration); };
+  const resetRest = () => { clearRestStore(); cancelRestDone(); };
+  const adjustRest = (delta: number) => {
+    const nd = Math.max(10, Math.min(900, restDuration + delta));
+    setRestDuration(nd);
+    if (restStartAt) {
+      const remain = nd - Math.floor((Date.now() - restStartAt) / 1000);
+      if (remain > 0) scheduleRestDone(remain);
+      else { clearRestStore(); cancelRestDone(); }
+    }
+  };
 
   // アクティブなセッションが無ければ、メニューを選んで開始する画面
   if (!session) {
@@ -91,14 +125,7 @@ export default function Workout() {
 
   const finish = () => { finishSession(session.id); router.back(); };
 
-  // レストタイマー（セット完了で自動スタート。秒数は永続化された restDuration を使う）
-  const startRest = () => setRestStartAt(Date.now());
-  const restElapsed = restStartAt ? Math.floor((now - restStartAt) / 1000) : 0;
-  const restRemain = restStartAt ? Math.max(0, restDuration - restElapsed) : restDuration;
-  const restDone = restStartAt != null && restRemain === 0;
-  const rmm = String(Math.floor(restRemain / 60)).padStart(2, '0');
-  const rss = String(restRemain % 60).padStart(2, '0');
-
+  // セット完了でレスト自動スタート（離れても/閉じても継続するよう永続化＋通知予約）
   const toggleSet = (s: SetRecord) => {
     const next = !s.completed;
     updateSet(session.id, s.id, { completed: next });
@@ -119,17 +146,23 @@ export default function Workout() {
         <Win style={styles.restWin}>
           <PixelText size={11} color={colors.inkDim}>レストタイマー</PixelText>
           <View style={styles.restRow}>
-            <Pressable onPress={() => setRestDuration(restDuration - 30)} style={styles.restAdj}>
-              <PixelText size={15} color={colors.ink}>-30秒</PixelText>
+            <Pressable onPress={() => adjustRest(-30)} style={styles.restAdj}>
+              <PixelText size={13} color={colors.ink}>-30</PixelText>
             </Pressable>
-            <PixelText size={32} color={restDone ? colors.success : colors.frameHi} shadow style={styles.restTime}>
+            <Pressable onPress={() => adjustRest(-10)} style={styles.restAdj}>
+              <PixelText size={13} color={colors.ink}>-10</PixelText>
+            </Pressable>
+            <PixelText size={30} color={restDone ? colors.success : colors.frameHi} shadow style={styles.restTime}>
               {restDone ? '休憩おわり' : `${rmm}:${rss}`}
             </PixelText>
-            <Pressable onPress={() => setRestDuration(restDuration + 10)} style={styles.restAdj}>
-              <PixelText size={15} color={colors.ink}>+10秒</PixelText>
+            <Pressable onPress={() => adjustRest(10)} style={styles.restAdj}>
+              <PixelText size={13} color={colors.ink}>+10</PixelText>
+            </Pressable>
+            <Pressable onPress={() => adjustRest(30)} style={styles.restAdj}>
+              <PixelText size={13} color={colors.ink}>+30</PixelText>
             </Pressable>
           </View>
-          <Pressable onPress={() => setRestStartAt(null)} hitSlop={8} style={styles.restReset}>
+          <Pressable onPress={resetRest} hitSlop={8} style={styles.restReset}>
             <PixelText size={11} color={colors.inkDim}>リセット</PixelText>
           </Pressable>
         </Win>
@@ -250,11 +283,11 @@ const styles = StyleSheet.create({
   scroll: { padding: 14, gap: 10 },
   headerWin: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   restWin: { alignItems: 'center', gap: 6 },
-  restRow: { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch', gap: 8 },
+  restRow: { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch', gap: 4 },
   restTime: { flex: 1, textAlign: 'center' },
   restAdj: {
     borderWidth: 2, borderColor: colors.frame, borderRadius: 4,
-    paddingHorizontal: 12, paddingVertical: 10, backgroundColor: colors.win,
+    paddingHorizontal: 8, paddingVertical: 10, backgroundColor: colors.win, minWidth: 38, alignItems: 'center',
   },
   restReset: { paddingVertical: 2, paddingHorizontal: 10 },
   exHead: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 8 },
