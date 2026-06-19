@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { View, ScrollView, Pressable, TextInput, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { useStore } from '../src/store/useStore';
 import { colors, muscleColor, muscleGroups } from '../src/theme';
 import type { MuscleGroup } from '../src/theme';
@@ -9,13 +8,11 @@ import type { RoutineItem } from '../src/types';
 import { Win, PixelText, PixelButton } from '../src/components/Frame';
 
 export default function Routines() {
-  const router = useRouter();
   const routines = useStore((s) => s.routines);
   const exercises = useStore((s) => s.exercises);
   const getExercise = useStore((s) => s.getExercise);
   const addRoutine = useStore((s) => s.addRoutine);
   const deleteRoutine = useStore((s) => s.deleteRoutine);
-  const startFromRoutine = useStore((s) => s.startSessionFromRoutine);
 
   const [name, setName] = useState('');
   const [items, setItems] = useState<RoutineItem[]>([]);
@@ -34,7 +31,6 @@ export default function Routines() {
     setName(''); setItems([]); setPickMuscle(null); setBuilding(false);
   };
 
-  const start = (id: string) => { startFromRoutine(id); router.push('/workout'); };
 
   const confirmDelete = (id: string, rname: string) =>
     Alert.alert('削除しますか？', rname, [
@@ -48,7 +44,7 @@ export default function Routines() {
 
         {routines.length === 0 && !building && (
           <Win><PixelText size={12} color={colors.inkDim} style={{ textAlign: 'center' }}>
-            よく使う種目の組み合わせを「ルーティン」として保存できます。
+            よく使う種目の組み合わせを「メニュー」として保存できます。
           </PixelText></Win>
         )}
 
@@ -63,15 +59,14 @@ export default function Routines() {
             <PixelText size={11} color={colors.inkDim} style={{ marginVertical: 6 }}>
               {r.items.map((it) => getExercise(it.exerciseId)?.name).filter(Boolean).join('・')}
             </PixelText>
-            <PixelButton label="このルーティンで開始" onPress={() => start(r.id)} />
           </Win>
         ))}
 
         {!building ? (
-          <PixelButton label="＋ ルーティンを作る" fill={colors.win} textColor={colors.ink} onPress={() => setBuilding(true)} />
+          <PixelButton label="＋ メニューを作る" fill={colors.win} textColor={colors.ink} onPress={() => setBuilding(true)} />
         ) : (
           <Win>
-            <PixelText size={11} color={colors.inkDim} style={{ marginBottom: 6 }}>─ 新しいルーティン ─</PixelText>
+            <PixelText size={11} color={colors.inkDim} style={{ marginBottom: 6 }}>─ 新しいメニュー ─</PixelText>
             <TextInput
               value={name} onChangeText={setName}
               placeholder="例: Push Day" placeholderTextColor={colors.inkDim} style={styles.input}

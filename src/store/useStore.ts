@@ -91,13 +91,18 @@ export const useStore = create<State>()(
 
       startSessionFromRoutine: (routineId) => {
         const routine = get().routines.find((r) => r.id === routineId);
+        const sessions = get().sessions;
         const id = uid();
         const sets: SetRecord[] = [];
         routine?.items.forEach((item) => {
+          // 前回の値を呼び出してプリフィル（履歴が無ければ目標値）
+          const last = lastEntryFor(sessions, item.exerciseId);
           for (let i = 1; i <= Math.max(1, item.targetSets); i++) {
             sets.push({
               id: uid(), exerciseId: item.exerciseId, setIndex: i,
-              weight: 0, reps: item.targetReps, completed: false,
+              weight: last?.weight ?? 0,
+              reps: last?.reps ?? item.targetReps,
+              completed: false,
             });
           }
         });
@@ -112,17 +117,25 @@ export const useStore = create<State>()(
         get().sessions.find((s) => s.id === get().currentSessionId),
 
       addExerciseToSession: (sessionId, exerciseId) =>
-        set((s) => ({
-          sessions: s.sessions.map((sess) =>
-            sess.id !== sessionId ? sess : {
-              ...sess,
-              sets: [
-                ...sess.sets,
-                { id: uid(), exerciseId, setIndex: 1, weight: 0, reps: 10, completed: false },
-              ],
-            }
-          ),
-        })),
+        set((s) => {
+          const last = lastEntryFor(s.sessions, exerciseId);
+          return {
+            sessions: s.sessions.map((sess) =>
+              sess.id !== sessionId ? sess : {
+                ...sess,
+                sets: [
+                  ...sess.sets,
+                  {
+                    id: uid(), exerciseId, setIndex: 1,
+                    weight: last?.weight ?? 0,
+                    reps: last?.reps ?? 10,
+                    completed: false,
+                  },
+                ],
+              }
+            ),
+          };
+        }),
 
       addSet: (sessionId, exerciseId) =>
         set((s) => ({
@@ -207,3 +220,23 @@ export const completedCount = (s: WorkoutSession) =>
 
 export const formatVolume = (v: number) =>
   v >= 1000 ? `${(v / 1000).toFixed(1)}t` : `${Math.round(v)}kg`;
+
+// その種目の「前回の値」。完了済みの最重量セットを優先し、無ければ最後のセット。
+// 直近の（終了済み）セッションから探す。見つからなければ null。
+export const lastEntryFor = (
+  sessions: WorkoutSession[],
+  exerciseId: string,
+): { weight: number; reps: number } | null => {
+  const finished = sessions
+    .filter((s) => s.endedAt)
+    .sort((a, b) => b.startedAt - a.startedAt);
+  for (const s of finished) {
+    const sets = s.sets.filter((x) => x.exerciseId === exerciseId);
+    if (sets.length === 0) continue;
+    const done = sets.filter((x) => x.completed && x.weight > 0);
+    const pool = done.length ? done : sets;
+    const best = pool.reduce((m, x) => (x.weight > m.weight ? x : m), pool[0]);
+    return { weight: best.weight, reps: best.reps };
+  }
+  return null;
+};

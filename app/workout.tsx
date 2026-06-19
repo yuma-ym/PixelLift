@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, ScrollView, Pressable, TextInput, StyleSheet, Alert } from 'react-native';
+import { View, ScrollView, Pressable, TextInput, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
 import { useStore, sessionVolume, completedCount, formatVolume } from '../src/store/useStore';
@@ -21,7 +21,9 @@ export default function Workout() {
   const addExerciseToSession = useStore((s) => s.addExerciseToSession);
   const removeExerciseFromSession = useStore((s) => s.removeExerciseFromSession);
   const finishSession = useStore((s) => s.finishSession);
-  const discardSession = useStore((s) => s.discardSession);
+  const routines = useStore((s) => s.routines);
+  const startFromRoutine = useStore((s) => s.startSessionFromRoutine);
+  const startEmpty = useStore((s) => s.startEmptySession);
 
   const [now, setNow] = useState(Date.now());
   const [pickerMuscle, setPickerMuscle] = useState<MuscleGroup | null>(null);
@@ -31,10 +33,43 @@ export default function Workout() {
     return () => clearInterval(t);
   }, []);
 
+  // アクティブなセッションが無ければ、メニューを選んで開始する画面
   if (!session) {
     return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.center}><PixelText color={colors.inkDim}>セッションがありません</PixelText></View>
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <ScrollView contentContainerStyle={styles.scroll}>
+          <Win style={styles.headerWin}>
+            <Pressable onPress={() => router.back()} hitSlop={10}>
+              <PixelText size={13} color={colors.frameHi}>← 戻る</PixelText>
+            </Pressable>
+            <PixelText size={13} color={colors.frameHi}>メニューを選ぶ</PixelText>
+            <View style={{ width: 40 }} />
+          </Win>
+
+          {routines.length === 0 ? (
+            <Win>
+              <PixelText size={12} color={colors.inkDim} style={{ textAlign: 'center', marginBottom: 10 }}>
+                メニューがまだありません。{'\n'}「メニュー」画面で作成してください。
+              </PixelText>
+              <PixelButton label="メニューを作る" onPress={() => router.push('/routines')} />
+            </Win>
+          ) : (
+            routines.map((r) => (
+              <Pressable key={r.id} onPress={() => startFromRoutine(r.id)}
+                style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
+                <Win>
+                  <PixelText size={15} color={colors.frameHi}>{r.name}</PixelText>
+                  <PixelText size={11} color={colors.inkDim} style={{ marginTop: 6 }}>
+                    {r.items.map((it) => getExercise(it.exerciseId)?.name).filter(Boolean).join('・')}
+                  </PixelText>
+                </Win>
+              </Pressable>
+            ))
+          )}
+
+          <PixelButton label="メニューなしで始める" fill={colors.win} textColor={colors.ink} onPress={startEmpty} />
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -51,13 +86,6 @@ export default function Workout() {
     map[set.exerciseId].push(set);
   }
 
-  const confirmDiscard = () => {
-    Alert.alert('冒険をやめますか？', '記録は保存されません。', [
-      { text: 'つづける', style: 'cancel' },
-      { text: 'やめる', style: 'destructive', onPress: () => { discardSession(session.id); router.back(); } },
-    ]);
-  };
-
   const finish = () => { finishSession(session.id); router.back(); };
 
   return (
@@ -66,7 +94,7 @@ export default function Workout() {
       <ScrollView contentContainerStyle={styles.scroll}>
 
         <Win style={styles.headerWin}>
-          <Pressable onPress={confirmDiscard}><PixelText size={11} color={colors.danger}>×にげる</PixelText></Pressable>
+          <Pressable onPress={finish} hitSlop={10}><PixelText size={13} color={colors.frameHi}>← 戻る</PixelText></Pressable>
           <PixelText size={13} color={colors.frameHi}>{session.name}</PixelText>
           <PixelText size={11} color={colors.inkDim}>{mm}:{ss}</PixelText>
         </Win>
@@ -145,8 +173,6 @@ export default function Workout() {
             </View>
           )}
         </Win>
-
-        <PixelButton label="たたかいをおえる" fill={colors.success} onPress={finish} />
 
       </ScrollView>
     </SafeAreaView>

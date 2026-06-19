@@ -14,7 +14,6 @@ export default function Home() {
   const router = useRouter();
   const sessions = useStore((s) => s.sessions);
   const currentId = useStore((s) => s.currentSessionId);
-  const startEmpty = useStore((s) => s.startEmptySession);
 
   const finished = sessions.filter((s) => s.endedAt);
   const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
@@ -26,10 +25,8 @@ export default function Home() {
   const rank = rankFor(totalVolume);
 
   const selectMuscle = (m: MuscleGroup) => router.push(`/muscle/${encodeURIComponent(m)}`);
-  const startWorkout = () => {
-    if (!currentId) startEmpty();
-    router.push('/workout');
-  };
+  // ダンベル→ワークアウト画面へ。セッションが無ければ画面側でメニューを選ぶ。
+  const startWorkout = () => router.push('/workout');
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -68,7 +65,7 @@ export default function Home() {
         <Hero onSelectMuscle={selectMuscle} onStartWorkout={startWorkout} />
 
         <View style={styles.navRow}>
-          <NavButton label="ルーティン" onPress={() => router.push('/routines')} />
+          <NavButton label="メニュー" onPress={() => router.push('/routines')} />
           <NavButton label="きろく" onPress={() => router.push('/history')} />
         </View>
 

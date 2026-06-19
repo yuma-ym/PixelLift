@@ -38,7 +38,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="muscle/[group]" options={{ title: '種目' }} />
         <Stack.Screen name="workout" options={{ title: 'ワークアウト', presentation: 'fullScreenModal' }} />
-        <Stack.Screen name="routines" options={{ title: 'ルーティン' }} />
+        <Stack.Screen name="routines" options={{ title: 'メニュー' }} />
         <Stack.Screen name="history" options={{ title: 'きろく' }} />
       </Stack>
     </>
