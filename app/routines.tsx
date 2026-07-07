@@ -6,6 +6,7 @@ import { colors, muscleColor, muscleGroups } from '../src/theme';
 import type { MuscleGroup } from '../src/theme';
 import type { RoutineItem } from '../src/types';
 import { Win, PixelText, PixelButton } from '../src/components/Frame';
+import Backdrop from '../src/components/Backdrop';
 
 export default function Routines() {
   const routines = useStore((s) => s.routines);
@@ -63,6 +64,7 @@ export default function Routines() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <Backdrop />
       <ScrollView contentContainerStyle={styles.scroll}>
 
         {routines.length === 0 && !building && (

@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { useStore, muscleRecency } from '../src/store/useStore';
 import { colors } from '../src/theme';
 import Hero from '../src/components/Hero';
-import Starfield from '../src/components/Starfield';
+import Backdrop from '../src/components/Backdrop';
 import { Win, PixelText, PixelButton } from '../src/components/Frame';
 
 export default function Home() {
@@ -16,7 +16,7 @@ export default function Home() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <Starfield />
+      <Backdrop />
       <ScrollView contentContainerStyle={styles.scroll}>
 
         {/* タイトル */}

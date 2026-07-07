@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore, sessionVolume, completedCount, formatVolume } from '../src/store/useStore';
 import { colors, muscleColor } from '../src/theme';
 import { Win, PixelText } from '../src/components/Frame';
+import Backdrop from '../src/components/Backdrop';
 import type { SetRecord } from '../src/types';
 
 export default function History() {
@@ -30,6 +31,7 @@ export default function History() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <Backdrop />
       <ScrollView contentContainerStyle={styles.scroll}>
 
         {finished.length === 0 && (
