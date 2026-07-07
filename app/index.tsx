@@ -25,7 +25,7 @@ export default function Home() {
         </View>
 
         {currentId ? (
-          <PixelButton label="▶ 再開" fill={colors.success} onPress={() => router.push('/workout')} />
+          <PixelButton label="再開" fill={colors.success} onPress={() => router.push('/workout')} />
         ) : (
           <PixelButton label="ワークアウト開始" fill={colors.frame} onPress={() => router.push('/workout')} />
         )}
