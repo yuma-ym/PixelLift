@@ -3,6 +3,9 @@
 export const colors = {
   bg: '#0B0905',          // 背景（夜のダンジョン色）
   bgDeep: '#070502',      // さらに暗い最下層
+  bgGradientTop: '#2b1440',    // 背景グラデ最上部（黄昏の紫）
+  bgGradientMid: '#170f2c',    // 背景グラデ中間（藍）
+  bgGradientBottom: '#0B0905', // 背景グラデ最下部（既存の闇色に合流）
   stage: '#15110B',       // ステージ面
   stageGlow: '#241a0f',   // ステージ上部の薄明かり
   win: '#181208',         // ウィンドウ地（黒に近い茶）

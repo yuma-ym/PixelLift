@@ -5,6 +5,7 @@ import { useStore, muscleRecency } from '../../src/store/useStore';
 import { colors, muscleColor } from '../../src/theme';
 import type { MuscleGroup } from '../../src/theme';
 import { Win, PixelText, MuscleTag } from '../../src/components/Frame';
+import Backdrop from '../../src/components/Backdrop';
 
 const SUB_MUSCLES: Record<string, { name: string; desc: string }[]> = {
   '胸': [
@@ -56,6 +57,7 @@ export default function MuscleScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <Stack.Screen options={{ title: `${group}` }} />
+      <Backdrop />
       <ScrollView contentContainerStyle={styles.scroll}>
 
         <View style={[styles.banner, { borderColor: muscleColor[group] }]}>

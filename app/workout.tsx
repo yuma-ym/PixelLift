@@ -7,6 +7,7 @@ import { colors, muscleColor } from '../src/theme';
 import type { MuscleGroup } from '../src/theme';
 import { muscleGroups } from '../src/theme';
 import { Win, PixelText, PixelButton } from '../src/components/Frame';
+import Backdrop from '../src/components/Backdrop';
 import type { SetRecord } from '../src/types';
 import { setupNotifications, scheduleRestDone, cancelRestDone } from '../src/notify';
 
@@ -79,6 +80,7 @@ export default function Workout() {
     return (
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <Stack.Screen options={{ headerShown: false }} />
+        <Backdrop />
         <ScrollView contentContainerStyle={styles.scroll}>
           <Win style={styles.headerWin}>
             <Pressable onPress={() => router.back()} hitSlop={10}>
