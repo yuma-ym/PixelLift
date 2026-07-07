@@ -12,13 +12,17 @@ interface State {
   sessions: WorkoutSession[];
   currentSessionId: string | null;
   seeded: boolean;
-  restDuration: number;          // レスト秒数（永続化）
-  restStartAt: number | null;    // レスト開始時刻。画面を離れても/再起動しても継続するため永続化
+  restDuration: number;          // レスト秒数（設定値・永続化）
+  restStartAt: number | null;    // レスト開始時刻
+  restActiveDuration: number | null; // タイマー開始時に固定したduration
+  restPausedRemain: number | null; // 一時停止中の残り秒数
 
   // セットアップ
   seedIfNeeded: () => void;
   setRestDuration: (n: number) => void;
   startRest: () => void;
+  pauseRest: (remain: number) => void;
+  resumeRest: () => void;
   clearRest: () => void;
 
   // 種目
@@ -54,6 +58,8 @@ export const useStore = create<State>()(
       seeded: false,
       restDuration: 90,
       restStartAt: null,
+      restActiveDuration: null,
+      restPausedRemain: null,
 
       seedIfNeeded: () => {
         if (get().seeded || get().exercises.length > 0) return;
@@ -61,8 +67,17 @@ export const useStore = create<State>()(
       },
 
       setRestDuration: (n) => set({ restDuration: Math.max(10, Math.min(900, Math.round(n))) }),
-      startRest: () => set({ restStartAt: Date.now() }),
-      clearRest: () => set({ restStartAt: null }),
+      startRest: () => set({ restStartAt: Date.now(), restActiveDuration: get().restDuration, restPausedRemain: null }),
+      pauseRest: (remain) => set({ restStartAt: null, restPausedRemain: remain > 0 ? remain : null }),
+      resumeRest: () => {
+        const pr = get().restPausedRemain;
+        const ad = get().restActiveDuration ?? get().restDuration;
+        if (pr && pr > 0) {
+          const offset = (ad - pr) * 1000;
+          set({ restStartAt: Date.now() - offset, restActiveDuration: ad, restPausedRemain: null });
+        }
+      },
+      clearRest: () => set({ restStartAt: null, restActiveDuration: null, restPausedRemain: null }),
 
       addExercise: (name, muscle, instructions) =>
         set((s) => ({
@@ -219,6 +234,8 @@ export const useStore = create<State>()(
         seeded: s.seeded,
         restDuration: s.restDuration,
         restStartAt: s.restStartAt,
+        restActiveDuration: s.restActiveDuration,
+        restPausedRemain: s.restPausedRemain,
       }),
     }
   )
@@ -233,6 +250,28 @@ export const completedCount = (s: WorkoutSession) =>
 
 export const formatVolume = (v: number) =>
   v >= 1000 ? `${(v / 1000).toFixed(1)}t` : `${Math.round(v)}kg`;
+
+// 各部位を最後に鍛えた日からの経過日数
+export const muscleRecency = (
+  sessions: WorkoutSession[],
+  exercises: Exercise[],
+): Record<MuscleGroup, number> => {
+  const exMuscle: Record<string, MuscleGroup> = {};
+  for (const e of exercises) exMuscle[e.id] = e.muscle;
+  const result: Record<string, number> = {};
+  const now = Date.now();
+  const groups: MuscleGroup[] = ['胸', '背中', '肩', '腕', '腹', '脚'];
+  for (const g of groups) result[g] = 999;
+  for (const s of sessions) {
+    const days = Math.floor((now - s.startedAt) / 86400000);
+    for (const set of s.sets) {
+      if (!set.completed) continue;
+      const m = exMuscle[set.exerciseId];
+      if (m && days < result[m]) result[m] = days;
+    }
+  }
+  return result as Record<MuscleGroup, number>;
+};
 
 // その種目の「前回の値」。完了済みの最重量セットを優先し、無ければ最後のセット。
 // 直近の（終了済み）セッションから探す。見つからなければ null。

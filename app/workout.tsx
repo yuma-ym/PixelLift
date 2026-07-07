@@ -33,6 +33,10 @@ export default function Workout() {
   const restStartAt = useStore((s) => s.restStartAt);
   const startRestStore = useStore((s) => s.startRest);
   const clearRestStore = useStore((s) => s.clearRest);
+  const pauseRestStore = useStore((s) => s.pauseRest);
+  const resumeRestStore = useStore((s) => s.resumeRest);
+  const restPausedRemain = useStore((s) => s.restPausedRemain);
+  const restActiveDuration = useStore((s) => s.restActiveDuration);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -42,10 +46,14 @@ export default function Workout() {
   // 通知の初期設定（権限・チャンネル）
   useEffect(() => { setupNotifications(); }, []);
 
-  // ── レストタイマー（永続化された restStartAt/restDuration から算出）──
-  const restElapsed = restStartAt ? Math.floor((now - restStartAt) / 1000) : 0;
-  const restRemain = restStartAt ? Math.max(0, restDuration - restElapsed) : restDuration;
-  const restDone = restStartAt != null && restRemain === 0;
+  // ── レストタイマー（永続化された restStartAt から算出。restActiveDurationで±の影響を排除）──
+  const activeDur = restActiveDuration ?? restDuration;
+  const restElapsed = restStartAt ? Math.max(0, Math.floor((now - restStartAt) / 1000)) : 0;
+  const restRemain = restPausedRemain != null ? restPausedRemain
+    : restStartAt ? Math.max(0, activeDur - restElapsed) : restDuration;
+  const restDone = restStartAt != null && restPausedRemain == null && restRemain === 0;
+  const restRunning = restStartAt != null && restPausedRemain == null;
+  const restPaused = restPausedRemain != null;
   const rmm = String(Math.floor(restRemain / 60)).padStart(2, '0');
   const rss = String(restRemain % 60).padStart(2, '0');
 
@@ -59,15 +67,11 @@ export default function Workout() {
   }, [restDone]);
 
   const startRest = () => { startRestStore(); scheduleRestDone(restDuration); };
+  const pauseRest = () => { if (restRunning) { pauseRestStore(restRemain); cancelRestDone(); } };
+  const resumeRest = () => { resumeRestStore(); if (restPausedRemain && restPausedRemain > 0) scheduleRestDone(restPausedRemain); };
   const resetRest = () => { clearRestStore(); cancelRestDone(); };
   const adjustRest = (delta: number) => {
-    const nd = Math.max(10, Math.min(900, restDuration + delta));
-    setRestDuration(nd);
-    if (restStartAt) {
-      const remain = nd - Math.floor((Date.now() - restStartAt) / 1000);
-      if (remain > 0) scheduleRestDone(remain);
-      else { clearRestStore(); cancelRestDone(); }
-    }
+    setRestDuration(Math.max(10, Math.min(900, restDuration + delta)));
   };
 
   // アクティブなセッションが無ければ、メニューを選んで開始する画面
@@ -138,7 +142,7 @@ export default function Workout() {
   // 安定ソート（同バケット内は出現順を維持）
   const sortedOrder = [...order].sort((a, b) => bucketOf(a) - bucketOf(b));
 
-  const finish = () => { finishSession(session.id); router.back(); };
+  const finish = () => { clearRestStore(); cancelRestDone(); finishSession(session.id); router.back(); };
 
   // セット完了でレスト自動スタート（離れても/閉じても継続するよう永続化＋通知予約）
   const toggleSet = (s: SetRecord) => {
@@ -153,33 +157,48 @@ export default function Workout() {
       <ScrollView contentContainerStyle={styles.scroll}>
 
         <Win style={styles.headerWin}>
-          <Pressable onPress={finish} hitSlop={10}><PixelText size={13} color={colors.frameHi}>← 戻る</PixelText></Pressable>
+          <Pressable onPress={() => router.back()} hitSlop={10}><PixelText size={13} color={colors.frameHi}>← 戻る</PixelText></Pressable>
           <PixelText size={13} color={colors.frameHi}>{session.name}</PixelText>
           <PixelText size={11} color={colors.inkDim}>{mm}:{ss}</PixelText>
         </Win>
+
+        <Pressable onPress={finish} style={styles.finishBtn}>
+          <PixelText size={14} color="#fff">ワークアウト終了</PixelText>
+        </Pressable>
 
         <Win style={styles.restWin}>
           <PixelText size={11} color={colors.inkDim}>レストタイマー</PixelText>
           <View style={styles.restRow}>
             <Pressable onPress={() => adjustRest(-30)} style={styles.restAdj}>
-              <PixelText size={13} color={colors.ink}>-30</PixelText>
+              <PixelText size={11} color={colors.ink}>-30</PixelText>
             </Pressable>
             <Pressable onPress={() => adjustRest(-10)} style={styles.restAdj}>
-              <PixelText size={13} color={colors.ink}>-10</PixelText>
+              <PixelText size={11} color={colors.ink}>-10</PixelText>
             </Pressable>
-            <PixelText size={30} color={restDone ? colors.success : colors.frameHi} shadow style={styles.restTime}>
-              {restDone ? '休憩おわり' : `${rmm}:${rss}`}
+            <PixelText size={12} color={colors.inkDim} style={styles.restTime}>
+              {String(Math.floor(restDuration / 60)).padStart(2, '0')}:{String(restDuration % 60).padStart(2, '0')}
             </PixelText>
             <Pressable onPress={() => adjustRest(10)} style={styles.restAdj}>
-              <PixelText size={13} color={colors.ink}>+10</PixelText>
+              <PixelText size={11} color={colors.ink}>+10</PixelText>
             </Pressable>
             <Pressable onPress={() => adjustRest(30)} style={styles.restAdj}>
-              <PixelText size={13} color={colors.ink}>+30</PixelText>
+              <PixelText size={11} color={colors.ink}>+30</PixelText>
             </Pressable>
           </View>
-          <Pressable onPress={resetRest} hitSlop={8} style={styles.restReset}>
-            <PixelText size={11} color={colors.inkDim}>リセット</PixelText>
-          </Pressable>
+          <PixelText size={22} color={restDone ? colors.success : colors.frameHi} shadow>
+            {restDone ? '休憩おわり' : `${rmm}:${rss}`}
+          </PixelText>
+          <View style={styles.restControls}>
+            <Pressable onPress={restPaused ? resumeRest : startRest} hitSlop={8} style={styles.restAdj}>
+              <PixelText size={13} color={colors.success}>▶</PixelText>
+            </Pressable>
+            <Pressable onPress={resetRest} hitSlop={8} style={styles.restAdj}>
+              <PixelText size={13} color={colors.inkDim}>↻</PixelText>
+            </Pressable>
+            <Pressable onPress={pauseRest} hitSlop={8} style={styles.restAdj}>
+              <PixelText size={13} color={colors.frameHi}>⏸</PixelText>
+            </Pressable>
+          </View>
         </Win>
 
         {order.length === 0 && (
@@ -298,13 +317,14 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   scroll: { padding: 14, gap: 10 },
   headerWin: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  restWin: { alignItems: 'center', gap: 6 },
+  restWin: { alignItems: 'center', gap: 3 },
   restRow: { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch', gap: 4 },
   restTime: { flex: 1, textAlign: 'center' },
   restAdj: {
     borderWidth: 2, borderColor: colors.frame, borderRadius: 4,
-    paddingHorizontal: 8, paddingVertical: 10, backgroundColor: colors.win, minWidth: 38, alignItems: 'center',
+    paddingHorizontal: 6, paddingVertical: 5, backgroundColor: colors.win, minWidth: 32, alignItems: 'center',
   },
+  restControls: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   restReset: { paddingVertical: 2, paddingHorizontal: 10 },
   exDone: { opacity: 0.45 },
   exHead: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 8 },
@@ -329,5 +349,9 @@ const styles = StyleSheet.create({
   pickRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     borderWidth: 2, borderColor: colors.frame, borderRadius: 3, paddingHorizontal: 9, paddingVertical: 7,
+  },
+  finishBtn: {
+    alignItems: 'center', paddingVertical: 10, borderWidth: 2,
+    borderColor: '#c44', borderRadius: 4, backgroundColor: '#611',
   },
 });
