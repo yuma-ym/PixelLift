@@ -26,53 +26,16 @@ export default function Workout() {
   const startFromRoutine = useStore((s) => s.startSessionFromRoutine);
   const startEmpty = useStore((s) => s.startEmptySession);
 
-  const [now, setNow] = useState(Date.now());
   const [pickerMuscle, setPickerMuscle] = useState<MuscleGroup | null>(null);
   const restDuration = useStore((s) => s.restDuration);
-  const setRestDuration = useStore((s) => s.setRestDuration);
   const restStartAt = useStore((s) => s.restStartAt);
   const startRestStore = useStore((s) => s.startRest);
   const clearRestStore = useStore((s) => s.clearRest);
-  const pauseRestStore = useStore((s) => s.pauseRest);
-  const resumeRestStore = useStore((s) => s.resumeRest);
-  const restPausedRemain = useStore((s) => s.restPausedRemain);
-  const restActiveDuration = useStore((s) => s.restActiveDuration);
-
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
 
   // 通知の初期設定（権限・チャンネル）
   useEffect(() => { setupNotifications(); }, []);
 
-  // ── レストタイマー（永続化された restStartAt から算出。restActiveDurationで±の影響を排除）──
-  const activeDur = restActiveDuration ?? restDuration;
-  const restElapsed = restStartAt ? Math.max(0, Math.floor((now - restStartAt) / 1000)) : 0;
-  const restRemain = restPausedRemain != null ? restPausedRemain
-    : restStartAt ? Math.max(0, activeDur - restElapsed) : restDuration;
-  const restDone = restStartAt != null && restPausedRemain == null && restRemain === 0;
-  const restRunning = restStartAt != null && restPausedRemain == null;
-  const restPaused = restPausedRemain != null;
-  const rmm = String(Math.floor(restRemain / 60)).padStart(2, '0');
-  const rss = String(restRemain % 60).padStart(2, '0');
-
-  // 前面でレストが 0 になった瞬間にバイブ
-  const prevDoneRef = useRef(false);
-  useEffect(() => {
-    if (restDone && !prevDoneRef.current) {
-      Vibration.vibrate(Platform.OS === 'android' ? [0, 300, 150, 300] : 800);
-    }
-    prevDoneRef.current = restDone;
-  }, [restDone]);
-
   const startRest = () => { startRestStore(); scheduleRestDone(restDuration); };
-  const pauseRest = () => { if (restRunning) { pauseRestStore(restRemain); cancelRestDone(); } };
-  const resumeRest = () => { resumeRestStore(); if (restPausedRemain && restPausedRemain > 0) scheduleRestDone(restPausedRemain); };
-  const resetRest = () => { clearRestStore(); cancelRestDone(); };
-  const adjustRest = (delta: number) => {
-    setRestDuration(Math.max(10, Math.min(900, restDuration + delta)));
-  };
 
   // アクティブなセッションが無ければ、メニューを選んで開始する画面
   if (!session) {
@@ -115,10 +78,6 @@ export default function Workout() {
     );
   }
 
-  const elapsed = Math.floor((now - session.startedAt) / 1000);
-  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
-  const ss = String(elapsed % 60).padStart(2, '0');
-
   // 種目ごとにまとめる（出現順）
   const order: string[] = [];
   const map: Record<string, SetRecord[]> = {};
@@ -159,47 +118,14 @@ export default function Workout() {
         <Win style={styles.headerWin}>
           <Pressable onPress={() => router.back()} hitSlop={10}><PixelText size={13} color={colors.frameHi}>← 戻る</PixelText></Pressable>
           <PixelText size={13} color={colors.frameHi}>{session.name}</PixelText>
-          <PixelText size={11} color={colors.inkDim}>{mm}:{ss}</PixelText>
+          <ElapsedClock startedAt={session.startedAt} />
         </Win>
 
         <Pressable onPress={finish} style={styles.finishBtn}>
           <PixelText size={14} color="#fff">ワークアウト終了</PixelText>
         </Pressable>
 
-        <Win style={styles.restWin}>
-          <PixelText size={11} color={colors.inkDim}>レストタイマー</PixelText>
-          <View style={styles.restRow}>
-            <Pressable onPress={() => adjustRest(-30)} style={styles.restAdj}>
-              <PixelText size={11} color={colors.ink}>-30</PixelText>
-            </Pressable>
-            <Pressable onPress={() => adjustRest(-10)} style={styles.restAdj}>
-              <PixelText size={11} color={colors.ink}>-10</PixelText>
-            </Pressable>
-            <PixelText size={12} color={colors.inkDim} style={styles.restTime}>
-              {String(Math.floor(restDuration / 60)).padStart(2, '0')}:{String(restDuration % 60).padStart(2, '0')}
-            </PixelText>
-            <Pressable onPress={() => adjustRest(10)} style={styles.restAdj}>
-              <PixelText size={11} color={colors.ink}>+10</PixelText>
-            </Pressable>
-            <Pressable onPress={() => adjustRest(30)} style={styles.restAdj}>
-              <PixelText size={11} color={colors.ink}>+30</PixelText>
-            </Pressable>
-          </View>
-          <PixelText size={22} color={restDone ? colors.success : colors.frameHi} shadow>
-            {restDone ? '休憩おわり' : `${rmm}:${rss}`}
-          </PixelText>
-          <View style={styles.restControls}>
-            <Pressable onPress={restPaused ? resumeRest : startRest} hitSlop={8} style={styles.restAdj}>
-              <PixelText size={13} color={colors.success}>▶</PixelText>
-            </Pressable>
-            <Pressable onPress={resetRest} hitSlop={8} style={styles.restAdj}>
-              <PixelText size={13} color={colors.inkDim}>↻</PixelText>
-            </Pressable>
-            <Pressable onPress={pauseRest} hitSlop={8} style={styles.restAdj}>
-              <PixelText size={13} color={colors.frameHi}>⏸</PixelText>
-            </Pressable>
-          </View>
-        </Win>
+        <RestTimer onStartRest={startRest} />
 
         {order.length === 0 && (
           <Win><PixelText size={12} color={colors.inkDim} style={{ textAlign: 'center' }}>
@@ -311,6 +237,114 @@ function SetRow(
     </View>
   );
 }
+// 経過時間の表示のみを1秒ごとに更新する。ここを分離することで
+// ワークアウト画面全体（スクロール中のセット一覧）が毎秒再描画されるのを防ぐ。
+function ElapsedClock({ startedAt }: { startedAt: number }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const elapsed = Math.floor((now - startedAt) / 1000);
+  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  const ss = String(elapsed % 60).padStart(2, '0');
+  return <PixelText size={11} color={colors.inkDim}>{mm}:{ss}</PixelText>;
+}
+
+// レストタイマー本体。カウントダウン表示を独立コンポーネントにして
+// 画面全体の再描画（＝スクロール位置のリセット）を避ける。
+function RestTimer({ onStartRest }: { onStartRest: () => void }) {
+  const restDuration = useStore((s) => s.restDuration);
+  const setRestDuration = useStore((s) => s.setRestDuration);
+  const restStartAt = useStore((s) => s.restStartAt);
+  const restActiveDuration = useStore((s) => s.restActiveDuration);
+  const restPausedRemain = useStore((s) => s.restPausedRemain);
+  const pauseRestStore = useStore((s) => s.pauseRest);
+  const resumeRestStore = useStore((s) => s.resumeRest);
+  const clearRestStore = useStore((s) => s.clearRest);
+
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const activeDur = restActiveDuration ?? restDuration;
+  const restElapsed = restStartAt ? Math.max(0, Math.floor((now - restStartAt) / 1000)) : 0;
+  const restRemain = restPausedRemain != null ? restPausedRemain
+    : restStartAt ? Math.max(0, activeDur - restElapsed) : restDuration;
+  const restDone = restStartAt != null && restPausedRemain == null && restRemain === 0;
+  const restRunning = restStartAt != null && restPausedRemain == null;
+  const restPaused = restPausedRemain != null;
+  const rmm = String(Math.floor(restRemain / 60)).padStart(2, '0');
+  const rss = String(restRemain % 60).padStart(2, '0');
+
+  const prevDoneRef = useRef(false);
+  useEffect(() => {
+    if (restDone && !prevDoneRef.current) {
+      Vibration.vibrate(Platform.OS === 'android' ? [0, 300, 150, 300] : 800);
+    }
+    prevDoneRef.current = restDone;
+  }, [restDone]);
+
+  const pauseRest = () => { if (restRunning) { pauseRestStore(restRemain); cancelRestDone(); } };
+  const resumeRest = () => { resumeRestStore(); if (restPausedRemain && restPausedRemain > 0) scheduleRestDone(restPausedRemain); };
+  const resetRest = () => { clearRestStore(); cancelRestDone(); };
+  const adjustRest = (delta: number) => {
+    setRestDuration(Math.max(10, Math.min(900, restDuration + delta)));
+  };
+
+  return (
+    <Win style={styles.restWin}>
+      <PixelText size={11} color={colors.inkDim}>レストタイマー</PixelText>
+      <View style={styles.restRow}>
+        <Pressable onPress={() => adjustRest(-30)} style={styles.restAdj}>
+          <PixelText size={11} color={colors.ink}>-30</PixelText>
+        </Pressable>
+        <Pressable onPress={() => adjustRest(-10)} style={styles.restAdj}>
+          <PixelText size={11} color={colors.ink}>-10</PixelText>
+        </Pressable>
+        <PixelText size={12} color={colors.inkDim} style={styles.restTime}>
+          {String(Math.floor(restDuration / 60)).padStart(2, '0')}:{String(restDuration % 60).padStart(2, '0')}
+        </PixelText>
+        <Pressable onPress={() => adjustRest(10)} style={styles.restAdj}>
+          <PixelText size={11} color={colors.ink}>+10</PixelText>
+        </Pressable>
+        <Pressable onPress={() => adjustRest(30)} style={styles.restAdj}>
+          <PixelText size={11} color={colors.ink}>+30</PixelText>
+        </Pressable>
+      </View>
+      <PixelText size={22} color={restDone ? colors.success : colors.frameHi} shadow>
+        {restDone ? '休憩おわり' : `${rmm}:${rss}`}
+      </PixelText>
+      <View style={styles.restControls}>
+        <Pressable onPress={restPaused ? resumeRest : onStartRest} hitSlop={8} style={styles.restAdj}>
+          <PlayIcon color={colors.success} />
+        </Pressable>
+        <Pressable onPress={resetRest} hitSlop={8} style={styles.restAdj}>
+          <PixelText size={13} color={colors.inkDim}>↻</PixelText>
+        </Pressable>
+        <Pressable onPress={pauseRest} hitSlop={8} style={styles.restAdj}>
+          <PauseIcon color={colors.frameHi} />
+        </Pressable>
+      </View>
+    </Win>
+  );
+}
+
+// ▶/⏸ の絵文字化を避けるため、View で組んだシンプルなアイコンを使う。
+function PlayIcon({ color }: { color: string }) {
+  return <View style={[styles.playIcon, { borderLeftColor: color }]} />;
+}
+
+function PauseIcon({ color }: { color: string }) {
+  return (
+    <View style={styles.pauseIcon}>
+      <View style={[styles.pauseBar, { backgroundColor: color }]} />
+      <View style={[styles.pauseBar, { backgroundColor: color }]} />
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
@@ -325,6 +359,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6, paddingVertical: 5, backgroundColor: colors.win, minWidth: 32, alignItems: 'center',
   },
   restControls: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  playIcon: {
+    width: 0, height: 0, marginLeft: 2,
+    borderTopWidth: 7, borderBottomWidth: 7, borderLeftWidth: 11,
+    borderTopColor: 'transparent', borderBottomColor: 'transparent',
+  },
+  pauseIcon: { flexDirection: 'row', gap: 4 },
+  pauseBar: { width: 4, height: 14, borderRadius: 1 },
   restReset: { paddingVertical: 2, paddingHorizontal: 10 },
   exDone: { opacity: 0.45 },
   exHead: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 8 },

@@ -89,7 +89,7 @@ export default function Hero({ heat }: Props) {
               {/* Front */}
               <View style={[styles.spriteCol, { left: 0 }]}>
                 <View pointerEvents="none" style={styles.shadowEllipse} />
-                <View style={styles.spriteInner}>
+                <View pointerEvents="none" style={styles.spriteInner}>
                   <HeroSprite view="front" width={SPRITE_W} height={SPRITE_H} heat={heat} />
                 </View>
                 <HitAreas view="front" onSelectMuscle={setDetail} />
@@ -101,7 +101,7 @@ export default function Hero({ heat }: Props) {
               {/* Back */}
               <View style={[styles.spriteCol, { left: HALF_W }]}>
                 <View pointerEvents="none" style={styles.shadowEllipse} />
-                <View style={styles.spriteInner}>
+                <View pointerEvents="none" style={styles.spriteInner}>
                   <HeroSprite view="back" width={SPRITE_W} height={SPRITE_H} heat={heat} />
                 </View>
                 <HitAreas view="back" onSelectMuscle={setDetail} />
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     position: 'absolute', left: HALF_W - 1, top: 20, bottom: 20, width: 1,
     backgroundColor: colors.frame, opacity: 0.3,
   },
-  abs: { position: 'absolute' },
+  abs: { position: 'absolute', zIndex: 5 },
   part: { borderWidth: 2, borderColor: colors.outline, overflow: 'hidden' },
   detailWrap: {
     ...StyleSheet.absoluteFillObject,

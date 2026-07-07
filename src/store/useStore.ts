@@ -1,13 +1,14 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { Exercise, Routine, WorkoutSession, SetRecord, MuscleGroup } from '../types';
+import type { Exercise, Routine, WorkoutSession, SetRecord, MuscleGroup, ExerciseTarget } from '../types';
 import { seedExercises } from '../data/seed';
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
 interface State {
   exercises: Exercise[];
+  exerciseTargets: Record<string, ExerciseTarget>; // 種目ごとの共通の目標重量・回数
   routines: Routine[];
   sessions: WorkoutSession[];
   currentSessionId: string | null;
@@ -29,9 +30,12 @@ interface State {
   addExercise: (name: string, muscle: MuscleGroup, instructions: string) => void;
   exercisesByMuscle: (muscle: MuscleGroup) => Exercise[];
   getExercise: (id: string) => Exercise | undefined;
+  getExerciseTarget: (exerciseId: string) => ExerciseTarget | undefined;
+  setExerciseTarget: (exerciseId: string, patch: Partial<ExerciseTarget>) => void;
 
   // ルーティン
   addRoutine: (name: string, items: Routine['items']) => void;
+  updateRoutine: (id: string, name: string, items: Routine['items']) => void;
   deleteRoutine: (id: string) => void;
 
   // ワークアウト
@@ -46,12 +50,14 @@ interface State {
   removeExerciseFromSession: (sessionId: string, exerciseId: string) => void;
   finishSession: (sessionId: string) => void;
   discardSession: (sessionId: string) => void;
+  deleteSession: (sessionId: string) => void;
 }
 
 export const useStore = create<State>()(
   persist(
     (set, get) => ({
       exercises: [],
+      exerciseTargets: {},
       routines: [],
       sessions: [],
       currentSessionId: null,
@@ -62,8 +68,16 @@ export const useStore = create<State>()(
       restPausedRemain: null,
 
       seedIfNeeded: () => {
-        if (get().seeded || get().exercises.length > 0) return;
-        set({ exercises: seedExercises, seeded: true });
+        if (!get().seeded && get().exercises.length === 0) {
+          set({ exercises: seedExercises, seeded: true });
+          return;
+        }
+        // 既存ユーザーにも、後から追加されたseed種目だけを補完する。
+        const existingIds = new Set(get().exercises.map((e) => e.id));
+        const missing = seedExercises.filter((e) => !existingIds.has(e.id));
+        if (missing.length > 0) {
+          set((s) => ({ exercises: [...s.exercises, ...missing] }));
+        }
       },
 
       setRestDuration: (n) => set({ restDuration: Math.max(10, Math.min(900, Math.round(n))) }),
@@ -91,8 +105,23 @@ export const useStore = create<State>()(
 
       getExercise: (id) => get().exercises.find((e) => e.id === id),
 
+      getExerciseTarget: (exerciseId) => get().exerciseTargets[exerciseId],
+
+      setExerciseTarget: (exerciseId, patch) =>
+        set((s) => {
+          const base = s.exerciseTargets[exerciseId] ?? { weight: 0, reps: 10 };
+          return {
+            exerciseTargets: { ...s.exerciseTargets, [exerciseId]: { ...base, ...patch } },
+          };
+        }),
+
       addRoutine: (name, items) =>
         set((s) => ({ routines: [...s.routines, { id: uid(), name: name.trim(), items }] })),
+
+      updateRoutine: (id, name, items) =>
+        set((s) => ({
+          routines: s.routines.map((r) => (r.id === id ? { ...r, name: name.trim(), items } : r)),
+        })),
 
       deleteRoutine: (id) =>
         set((s) => ({ routines: s.routines.filter((r) => r.id !== id) })),
@@ -121,13 +150,14 @@ export const useStore = create<State>()(
         const id = uid();
         const sets: SetRecord[] = [];
         routine?.items.forEach((item) => {
-          // 前回の値を呼び出してプリフィル（履歴が無ければ目標値）
+          // 前回の値を呼び出してプリフィル（履歴が無ければ種目共通の目標値）
           const last = lastEntryFor(sessions, item.exerciseId);
+          const target = get().exerciseTargets[item.exerciseId];
           for (let i = 1; i <= Math.max(1, item.targetSets); i++) {
             sets.push({
               id: uid(), exerciseId: item.exerciseId, setIndex: i,
-              weight: last?.weight ?? 0,
-              reps: last?.reps ?? item.targetReps,
+              weight: last?.weight ?? target?.weight ?? 0,
+              reps: last?.reps ?? target?.reps ?? 10,
               completed: false,
             });
           }
@@ -145,6 +175,7 @@ export const useStore = create<State>()(
       addExerciseToSession: (sessionId, exerciseId) =>
         set((s) => {
           const last = lastEntryFor(s.sessions, exerciseId);
+          const target = s.exerciseTargets[exerciseId];
           return {
             sessions: s.sessions.map((sess) =>
               sess.id !== sessionId ? sess : {
@@ -153,8 +184,8 @@ export const useStore = create<State>()(
                   ...sess.sets,
                   {
                     id: uid(), exerciseId, setIndex: 1,
-                    weight: last?.weight ?? 0,
-                    reps: last?.reps ?? 10,
+                    weight: last?.weight ?? target?.weight ?? 0,
+                    reps: last?.reps ?? target?.reps ?? 10,
                     completed: false,
                   },
                 ],
@@ -222,12 +253,18 @@ export const useStore = create<State>()(
           currentSessionId: null,
           sessions: s.sessions.filter((sess) => sess.id !== sessionId),
         })),
+
+      deleteSession: (sessionId) =>
+        set((s) => ({
+          sessions: s.sessions.filter((sess) => sess.id !== sessionId),
+        })),
     }),
     {
       name: 'pixel-lift-store',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (s) => ({
         exercises: s.exercises,
+        exerciseTargets: s.exerciseTargets,
         routines: s.routines,
         sessions: s.sessions,
         currentSessionId: s.currentSessionId,

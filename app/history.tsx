@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore, sessionVolume, completedCount, formatVolume } from '../src/store/useStore';
 import { colors, muscleColor } from '../src/theme';
@@ -9,9 +9,16 @@ import type { SetRecord } from '../src/types';
 export default function History() {
   const sessions = useStore((s) => s.sessions);
   const getExercise = useStore((s) => s.getExercise);
+  const deleteSession = useStore((s) => s.deleteSession);
   const finished = sessions
     .filter((s) => s.endedAt)
     .sort((a, b) => b.startedAt - a.startedAt);
+
+  const confirmDelete = (id: string, label: string) =>
+    Alert.alert('この記録を削除しますか？', label, [
+      { text: 'やめる', style: 'cancel' },
+      { text: '削除', style: 'destructive', onPress: () => deleteSession(id) },
+    ]);
 
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -52,6 +59,13 @@ export default function History() {
                     <PixelText size={11}>{completedCount(s)} セット</PixelText>
                     <PixelText size={11} color={colors.frameHi}>{formatVolume(sessionVolume(s))}</PixelText>
                   </View>
+                  <Pressable
+                    onPress={(e) => { e.stopPropagation(); confirmDelete(s.id, `${fmtDate(s.startedAt)} ${s.name}`); }}
+                    hitSlop={8}
+                    style={{ marginLeft: 10 }}
+                  >
+                    <PixelText size={14} color={colors.danger}>✕</PixelText>
+                  </Pressable>
                 </View>
 
                 {open && (

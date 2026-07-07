@@ -13,7 +13,12 @@ export interface Exercise {
 export interface RoutineItem {
   exerciseId: string;
   targetSets: number;
-  targetReps: number;
+}
+
+// 種目ごとの目標重量・回数。同じ種目はどのメニューでも共通の値を使う。
+export interface ExerciseTarget {
+  weight: number;
+  reps: number;
 }
 
 export interface Routine {
