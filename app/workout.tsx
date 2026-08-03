@@ -20,6 +20,7 @@ export default function Workout() {
   const addSet = useStore((s) => s.addSet);
   const updateSet = useStore((s) => s.updateSet);
   const deleteSet = useStore((s) => s.deleteSet);
+  const setExerciseMemo = useStore((s) => s.setExerciseMemo);
   const addExerciseToSession = useStore((s) => s.addExerciseToSession);
   const removeExerciseFromSession = useStore((s) => s.removeExerciseFromSession);
   const finishSession = useStore((s) => s.finishSession);
@@ -150,6 +151,11 @@ export default function Workout() {
                 </Pressable>
               </View>
 
+              <MemoInput
+                initial={session.exerciseMemos?.[exId] ?? ''}
+                onSave={(memo) => setExerciseMemo(session.id, exId, memo)}
+              />
+
               <View style={styles.colHead}>
                 <PixelText size={9} color={colors.inkDim} style={{ width: 22 }}>SET</PixelText>
                 <PixelText size={9} color={colors.inkDim} style={{ width: 62, textAlign: 'center' }}>kg</PixelText>
@@ -202,6 +208,22 @@ export default function Workout() {
 
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function MemoInput({ initial, onSave }: { initial: string; onSave: (memo: string) => void }) {
+  const [text, setText] = useState(initial);
+  return (
+    <TextInput
+      value={text}
+      onChangeText={setText}
+      onBlur={() => onSave(text)}
+      onEndEditing={() => onSave(text)}
+      placeholder="メモ（フォーム・気づき等）"
+      placeholderTextColor={colors.inkDim}
+      multiline
+      style={styles.memoInput}
+    />
   );
 }
 
@@ -370,7 +392,12 @@ const styles = StyleSheet.create({
   pauseBar: { width: 4, height: 14, borderRadius: 1 },
   restReset: { paddingVertical: 2, paddingHorizontal: 10 },
   exDone: { opacity: 0.45 },
-  exHead: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 8 },
+  exHead: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 6 },
+  memoInput: {
+    fontFamily: 'DotGothic16_400Regular', fontSize: 12, color: colors.inkDim,
+    borderWidth: 1, borderColor: colors.frameShadow, borderRadius: 3,
+    paddingHorizontal: 8, paddingVertical: 5, marginBottom: 8, minHeight: 32,
+  },
   exBar: { width: 8, height: 20, borderWidth: 2, borderColor: colors.outline },
   colHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 4, gap: 6 },
   setRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5, gap: 6 },

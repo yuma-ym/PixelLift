@@ -13,6 +13,7 @@ export interface Exercise {
 export interface RoutineItem {
   exerciseId: string;
   targetSets: number;
+  memo?: string;
 }
 
 // 種目ごとの目標重量・回数。同じ種目はどのメニューでも共通の値を使う。
@@ -42,4 +43,5 @@ export interface WorkoutSession {
   startedAt: number;  // epoch ms
   endedAt: number | null;
   sets: SetRecord[];
+  exerciseMemos?: Record<string, string>;
 }

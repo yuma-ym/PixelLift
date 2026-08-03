@@ -23,7 +23,7 @@ export default function Routines() {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const addItem = (exerciseId: string) =>
-    setItems((prev) => [...prev, { exerciseId, targetSets: 3 }]);
+    setItems((prev) => [...prev, { exerciseId, targetSets: 3, memo: '' }]);
 
   const removeItem = (i: number) =>
     setItems((prev) => prev.filter((_, idx) => idx !== i));
@@ -130,6 +130,10 @@ export default function Routines() {
                           onChange={(v) => updateItem(i, { targetSets: Math.max(1, v) })}
                         />
                       </View>
+                      <ItemMemoInput
+                        value={it.memo ?? ''}
+                        onSave={(memo) => updateItem(i, { memo })}
+                      />
                     </View>
                   );
                 })}
@@ -167,6 +171,22 @@ export default function Routines() {
 
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function ItemMemoInput({ value, onSave }: { value: string; onSave: (memo: string) => void }) {
+  const [text, setText] = useState(value);
+  return (
+    <TextInput
+      value={text}
+      onChangeText={setText}
+      onBlur={() => onSave(text)}
+      onEndEditing={() => onSave(text)}
+      placeholder="メモ（フォーム・気づき等）"
+      placeholderTextColor={colors.inkDim}
+      multiline
+      style={styles.memoInput}
+    />
   );
 }
 
@@ -221,6 +241,11 @@ const styles = StyleSheet.create({
   },
   itemHead: { flexDirection: 'row', alignItems: 'center' },
   itemFields: { flexDirection: 'row', gap: 8 },
+  memoInput: {
+    fontFamily: 'DotGothic16_400Regular', fontSize: 11, color: colors.inkDim,
+    borderTopWidth: 1, borderTopColor: colors.outline,
+    paddingHorizontal: 6, paddingVertical: 4, minHeight: 30,
+  },
   itemField: { alignItems: 'center' },
   itemFieldInput: {
     fontFamily: 'DotGothic16_400Regular', fontSize: 13, color: colors.ink, textAlign: 'center',

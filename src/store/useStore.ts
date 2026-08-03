@@ -39,6 +39,7 @@ interface State {
   deleteRoutine: (id: string) => void;
 
   // ワークアウト
+  setExerciseMemo: (sessionId: string, exerciseId: string, memo: string) => void;
   startEmptySession: () => string;
   startSessionFromRoutine: (routineId: string) => string;
   startSessionForMuscle: (muscle: MuscleGroup) => string;
@@ -126,6 +127,16 @@ export const useStore = create<State>()(
       deleteRoutine: (id) =>
         set((s) => ({ routines: s.routines.filter((r) => r.id !== id) })),
 
+      setExerciseMemo: (sessionId, exerciseId, memo) =>
+        set((s) => ({
+          sessions: s.sessions.map((sess) =>
+            sess.id !== sessionId ? sess : {
+              ...sess,
+              exerciseMemos: { ...sess.exerciseMemos, [exerciseId]: memo },
+            }
+          ),
+        })),
+
       startEmptySession: () => {
         const id = uid();
         const session: WorkoutSession = {
@@ -162,8 +173,12 @@ export const useStore = create<State>()(
             });
           }
         });
+        const exerciseMemos: Record<string, string> = {};
+        routine?.items.forEach((item) => {
+          if (item.memo) exerciseMemos[item.exerciseId] = item.memo;
+        });
         const session: WorkoutSession = {
-          id, name: routine?.name ?? 'ワークアウト', startedAt: Date.now(), endedAt: null, sets,
+          id, name: routine?.name ?? 'ワークアウト', startedAt: Date.now(), endedAt: null, sets, exerciseMemos,
         };
         set((s) => ({ sessions: [session, ...s.sessions], currentSessionId: id }));
         return id;
